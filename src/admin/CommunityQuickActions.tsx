@@ -1,21 +1,22 @@
-import { Button, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Image, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { api, type Amenity, type Community, type Region } from '../api';
 
-export function CommunityQuickActions({ open, onClose, communities, regions, amenities, onEdit, reload }: {
-  open: boolean; onClose: () => void; communities: Community[]; regions: Region[]; amenities: Amenity[];
+export function CommunityQuickActions({ open, onClose, communities, regions, amenities, discardedOnly, onEdit, reload }: {
+  open: boolean; onClose: () => void; communities: Community[]; regions: Region[]; amenities: Amenity[]; discardedOnly?: boolean;
   onEdit: (community: Community) => void; reload: () => Promise<void>;
 }) {
   const [query, setQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [targetRegionId, setTargetRegionId] = useState<string>();
   const [messageApi, holder] = message.useMessage();
-  const rows = useMemo(() => communities.filter((item) => (item.name + ' ' + item.address).toLowerCase().includes(query.toLowerCase().trim())), [communities, query]);
+  const rows = useMemo(() => communities.filter((item) => (!discardedOnly || item.regionId === null) &&
+    (item.name + ' ' + item.address).toLowerCase().includes(query.toLowerCase().trim())), [communities, query, discardedOnly]);
   async function run(action: () => Promise<unknown>, success: string) {
     try { await action(); await reload(); setSelectedIds([]); messageApi.success(success); }
     catch (error) { messageApi.error(error instanceof Error ? error.message : '操作失败'); }
   }
-  return <Modal title="小区列表 · 快速操作" open={open} onCancel={onClose} footer={null} width="min(94vw, 1400px)" destroyOnHidden>
+  return <Modal title={discardedOnly ? '废弃小区站 · 快速操作' : '小区列表 · 快速操作'} open={open} onCancel={onClose} footer={null} width="min(94vw, 1400px)" destroyOnHidden>
     {holder}<Space wrap className="admin-filter-row">
       <Input.Search placeholder="搜索小区名称或地址" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: 260 }} />
       <Select placeholder="目标片区" value={targetRegionId} onChange={setTargetRegionId} style={{ width: 190 }}
@@ -39,6 +40,8 @@ export function CommunityQuickActions({ open, onClose, communities, regions, ame
         { title: '热门', width: 75, render: (_, row) => row.isHot ? <Tag color="red">是</Tag> : '否' },
         { title: '展示', width: 75, render: (_, row) => row.visible ? '是' : '否' },
         { title: '配套摘要', dataIndex: 'summary', width: 160, ellipsis: true },
+        { title: '简介', dataIndex: 'description', width: 180, ellipsis: true },
+        { title: '主图', width: 95, render: (_, row) => row.mainMediaId ? <Image src={`/api/media/${row.mainMediaId}`} width={56} height={42} /> : '—' },
         { title: '关联设施', width: 200, ellipsis: true, render: (_, row) => amenities
           .filter((item) => item.communityIds.includes(row.id)).map((item) => item.name).join('、') || '暂无' },
         { title: '操作', fixed: 'right', width: 150, render: (_, row) => <Space><Button size="small" onClick={() => onEdit(row)}>编辑</Button>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Amenity, Community, CommunitySummary, Position, Region } from './api';
 import { MAP_CONFIG, mapKeyConfigured } from './config/map';
 import { amenityMarkerText } from './domain/amenity-marker';
+import { regionLabelPosition } from './domain/region-label-position';
 
 declare global {
   interface Window {
@@ -34,6 +35,7 @@ export function MapView(props: Props) {
   const amap = useRef<any>(null);
   const overlays = useRef<any[]>([]);
   const townBoundary = useRef<any>(null);
+  const initialZoomLocked = useRef(false);
   const [loading, setLoading] = useState(mapKeyConfigured);
   const [error, setError] = useState('');
 
@@ -48,13 +50,14 @@ export function MapView(props: Props) {
         map.current = new AMap.Map(container.current, {
           center: MAP_CONFIG.initialCenter,
           zoom: 13,
+          zooms: [2, 20],
           viewMode: '3D',
           pitch: 0,
         });
         setLoading(false);
       })
       .catch(() => { if (!cancelled) { setError('地图加载失败，请检查 JS API Key、安全密钥及网络。'); setLoading(false); } });
-    return () => { cancelled = true; map.current?.destroy(); map.current = null; townBoundary.current = null; };
+    return () => { cancelled = true; map.current?.destroy(); map.current = null; townBoundary.current = null; initialZoomLocked.current = false; };
   }, []);
 
   useEffect(() => {
@@ -66,7 +69,13 @@ export function MapView(props: Props) {
       fillColor: '#44a69a', fillOpacity: 0.07, zIndex: 1, bubble: true });
     townBoundary.current = boundary;
     map.current.add(boundary);
-    if (!props.selectedRegionId && !props.focusPosition) map.current.setFitView([boundary], false, [40, 40, 40, 40]);
+    if (!props.selectedRegionId && !props.focusPosition) {
+      map.current.setFitView([boundary], true, [40, 40, 40, 40]);
+      if (!initialZoomLocked.current) {
+        map.current.setZooms([map.current.getZoom(), 20]);
+        initialZoomLocked.current = true;
+      }
+    }
   }, [loading, props.overviewBoundary, props.selectedRegionId, props.focusPosition]);
 
   useEffect(() => {
@@ -101,6 +110,12 @@ export function MapView(props: Props) {
       polygon.on('click', () => props.onRegionSelect(region.id));
       map.current.add(polygon);
       overlays.current.push(polygon);
+      const label = new AMap.Text({ text: region.name, position: regionLabelPosition(region.polygon), anchor: 'center', zIndex: 120,
+        style: { padding: '5px 11px', borderRadius: '16px', backgroundColor: 'rgba(16, 38, 56, .85)',
+          color: '#fff', fontSize: '13px', fontWeight: '600', border: `1px solid ${region.color}`, whiteSpace: 'nowrap' } });
+      label.on('click', () => props.onRegionSelect(region.id));
+      map.current.add(label);
+      overlays.current.push(label);
     }
     for (const community of props.communities) {
       if (!community.visible) continue;

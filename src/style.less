@@ -123,6 +123,8 @@ body {
 .admin-main-sidebar .sidebar-heading { padding: 24px 20px 12px; }
 .admin-main-content { min-width: 0; overflow: auto; }
 .admin-page { padding: 26px; }
+.admin-communities-page { height: calc(100dvh - 68px); min-height: 520px; display: flex; flex-direction: column; }
+.admin-communities-page .admin-directory-layout { flex: 1; min-height: 0; align-items: stretch; }
 .admin-page-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 20px; }
 .admin-page-heading h2 { margin: 0 0 4px; font-size: 24px; }
 .admin-global-error { margin: 16px 26px 0; }
@@ -137,6 +139,7 @@ body {
 .admin-directory-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
 .admin-directory-tree { padding: 12px; background: white; border: 1px solid #e4eaf0; border-radius: 10px; min-height: 560px; overflow: auto; }
 .admin-directory-tree-managed { display: flex; flex-direction: column; overflow: hidden; height: min(78vh, 860px); min-height: 480px; }
+.admin-communities-page .admin-directory-tree-managed { height: 100%; min-height: 0; }
 .admin-tree-actions { display: flex; gap: 8px; flex: none; padding-bottom: 10px; background: white; }
 .admin-tree-scroll { min-height: 0; overflow-y: auto; flex: 1; }
 .admin-tree-path { position: sticky; top: 0; z-index: 3; padding: 7px 8px; color: #126965; background: #edf8f7; border-bottom: 1px solid #d7eae8; font-size: 12px; }
@@ -145,10 +148,19 @@ body {
 .listing-media-thumbs > div { display: flex; flex-direction: column; gap: 4px; }
 .listing-media-thumb { width: 96px; height: 72px; object-fit: cover; border: 1px solid #d9e1e8; border-radius: 4px; }
 .admin-directory-content { min-width: 0; display: grid; gap: 16px; }
+.admin-communities-page .admin-directory-content { min-height: 0; height: 100%; }
+.admin-communities-page .admin-directory-content-editing { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.admin-communities-page .admin-directory-content-editing .admin-work-panel { min-height: 0; overflow-y: auto; }
 .admin-directory-content-editing { grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr); align-items: start; }
 .admin-community-map { height: 430px; min-width: 0; }
+.admin-communities-page .admin-community-map { height: 100%; min-height: 0; }
 .admin-directory-content-editing .admin-community-map { height: 640px; }
+.admin-communities-page .admin-directory-content-editing .admin-community-map { height: 100%; min-height: 0; }
 .admin-community-map .map-wrap, .admin-community-map .map-fallback { height: 100%; min-height: 0; }
+.community-image-editor { display: grid; gap: 12px; margin: 14px 0; }
+.community-image-editor > div { display: grid; gap: 8px; }
+.community-image-previews { display: flex; flex-wrap: wrap; gap: 10px; }
+.community-image-previews > div { display: grid; gap: 5px; justify-items: start; }
 .admin-facility-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 0.9fr); gap: 16px; align-items: start; }
 .admin-facility-map { min-width: 0; height: calc(100vh - 178px); min-height: 560px; }
 .admin-facility-map .map-wrap, .admin-facility-map .map-fallback { height: 100%; }
@@ -163,6 +175,8 @@ body {
   .admin-facility-map { height: 460px; min-height: 460px; }
   .admin-directory-layout { grid-template-columns: 250px minmax(0, 1fr); }
   .admin-directory-content-editing { grid-template-columns: 1fr; }
+  .admin-communities-page .admin-directory-content-editing { grid-template-columns: 1fr; overflow-y: auto; }
+  .admin-communities-page .admin-directory-content-editing .admin-community-map { min-height: 380px; }
 }
 .eyebrow {
   color: #4d8797;

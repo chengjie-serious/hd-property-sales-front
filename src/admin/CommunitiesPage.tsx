@@ -1,4 +1,4 @@
-import { Button, Modal, Popconfirm, Select, Space, Table, Tree, Typography, message } from 'antd';
+import { Button, Image, Modal, Popconfirm, Space, Tree, Typography, message } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Amenity, type Building, type Community, type Listing, type Position, type Region } from '../api';
 import { MapView } from '../MapView';
@@ -20,12 +20,11 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
   const [regionEditor, setRegionEditor] = useState<Region | 'new' | null>(null);
   const [drawnPolygon, setDrawnPolygon] = useState<Position[] | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [discardedOnly, setDiscardedOnly] = useState(false);
   const [structures, setStructures] = useState<Record<string, Building[]>>({});
   const [focusPosition, setFocusPosition] = useState<Position | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [firstVisibleKey, setFirstVisibleKey] = useState<string>('');
-  const [batchIds, setBatchIds] = useState<string[]>([]);
-  const [targetRegionId, setTargetRegionId] = useState<string>();
   const [messageApi, holder] = message.useMessage();
   const treeScrollRef = useRef<HTMLDivElement>(null);
   const selected = communities.find((item) => item.id === selectedId);
@@ -92,13 +91,16 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
     setSelectedId(community.id); setSelectedRegionId(community.regionId);
     setFocusPosition([community.longitude, community.latitude]);
   }
-  return <div className="admin-page">{holder}
+  return <div className="admin-page admin-communities-page">{holder}
     <div className="admin-page-heading"><div><h2>片区与小区</h2><Typography.Text type="secondary">在地图维护片区与小区，房屋挂牌在独立菜单维护</Typography.Text></div>
-      <Button onClick={() => { setSelectedId(null); setRegionEditor(null); setEditor('new'); setFocusPosition(null); }}>新增小区</Button></div>
+      <Space>{selectedRegionId && !selected && <><Button onClick={() => setRegionEditor(regions.find((region) => region.id === selectedRegionId) ?? null)}>编辑片区</Button>
+        <Popconfirm title="删除片区？关联小区进入废弃小区站" onConfirm={() => void run(async () => { await api.deleteRegion(selectedRegionId); setSelectedRegionId(null); }, '片区已删除')}>
+          <Button danger>删除片区</Button></Popconfirm></>}
+        <Button onClick={() => { setSelectedId(null); setRegionEditor(null); setEditor('new'); setFocusPosition(null); }}>新增小区</Button></Space></div>
     <div className="admin-directory-layout">
       <div className="admin-directory-tree admin-directory-tree-managed">
-        <div className="admin-tree-actions"><Button size="small" type="primary" onClick={() => { setSelectedId(null); setEditor(null); setRegionEditor('new'); setDrawnPolygon(null); }}>新增片区</Button>
-          <Button size="small" onClick={() => setQuickOpen(true)}>快速操作</Button></div>
+        <div className="admin-tree-actions"><Button size="small" type="primary" onClick={() => { setSelectedId(null); setEditor(null); setRegionEditor('new'); setDrawnPolygon(null); setFocusPosition(null); }}>新增片区</Button>
+          <Button size="small" onClick={() => { setDiscardedOnly(false); setQuickOpen(true); }}>快速操作</Button></div>
         <div className="admin-tree-scroll" ref={treeScrollRef} onScroll={updateFirstVisible}>
           {!!ancestors.length && <div className="admin-tree-path">{ancestors.map((title, index) => <span key={ancestorKeys[index]}>
             {index > 0 && ' › '}<button type="button" onClick={() => {
@@ -111,51 +113,28 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
             selectedKeys={selectedId ? ['community:' + selectedId] : selectedRegionId ? ['region:' + selectedRegionId] : []}
             onSelect={(keys) => {
               const key = String(keys[0] ?? '');
-              if (key.startsWith('region:')) { setSelectedRegionId(key.slice(7)); setSelectedId(null); }
+              if (key.startsWith('region:')) { setSelectedRegionId(key.slice(7)); setSelectedId(null); setFocusPosition(null); }
               else if (key.startsWith('community:')) { const item = communities.find((community) => community.id === key.slice(10)); if (item) chooseCommunity(item); }
               else if (['building', 'unit', 'floor', 'room'].some((kind) => key.startsWith(kind + ':'))) {
                 const item = communities.find((community) => community.id === key.split(':')[1]);
                 if (item) chooseCommunity(item);
               }
-              else if (key === 'discarded') { setSelectedId(null); setSelectedRegionId(null); }
+              else if (key === 'discarded') { setSelectedId(null); setSelectedRegionId(null); setFocusPosition(null); setDiscardedOnly(true); setQuickOpen(true); }
             }} />
         </div>
       </div>
       <div className={editor === 'new' || regionEditor ? 'admin-directory-content admin-directory-content-editing' : 'admin-directory-content'}>
         <div className="admin-community-map"><MapView regions={regions} communities={communities.filter((item) => item.regionId !== null)}
-          amenities={amenities} summaries={{}} selectedRegionId={selectedRegionId} onRegionSelect={(id) => { setSelectedRegionId(id); setSelectedId(null); }}
+          amenities={amenities} summaries={{}} selectedRegionId={selectedRegionId} onRegionSelect={(id) => { setSelectedRegionId(id); setSelectedId(null); setFocusPosition(null); }}
           onCommunitySelect={chooseCommunity} overviewBoundary={boundary} manualBoundaryMode focusPosition={focusPosition}
           onMapClick={editor ? (position) => setFocusPosition(position) : undefined}
           onPolygonDraw={regionEditor ? (polygon) => setDrawnPolygon(polygon) : undefined}
           drawLabel="绘制片区边界" /></div>
-        {editor === 'new' ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>新增小区</h3><Button onClick={() => setEditor(null)}>关闭</Button></div>
+        {editor === 'new' && <div className="admin-work-panel"><div className="admin-panel-title"><h3>新增小区</h3><Button onClick={() => setEditor(null)}>关闭</Button></div>
           <CommunityEditor regions={regions} amenities={amenities} actualBuildingCount={0} initialRegionId={selectedRegionId}
-            mapPosition={focusPosition} onSaved={async () => { await reload(); setEditor(null); }} onCancel={() => setEditor(null)} /></div>
-          : regionEditor ? <RegionEditor open region={regionEditor === 'new' ? undefined : regionEditor} polygon={drawnPolygon}
-            onClose={() => setRegionEditor(null)} onSaved={reload} />
-          : selected ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>{selected.name}</h3>
-          <Space><Button onClick={() => setEditor(selected)}>编辑小区</Button>
-            <Popconfirm title={selected.regionId ? '移入废弃小区站？' : '永久删除小区及其房源和图片？'}
-              onConfirm={() => void run(async () => { await api.deleteCommunity(selected.id); setSelectedId(null); }, selected.regionId ? '已移入废弃站' : '已永久删除')}>
-              <Button danger>{selected.regionId ? '移至废弃站' : '永久删除'}</Button></Popconfirm></Space></div>
-          <p>{selected.address} · {regions.find((region) => region.id === selected.regionId)?.name ?? '废弃小区站'}</p>
-          <p>交付日期：{selected.deliveryDate}　规划楼幢：{selected.buildingCount}　已录入：{structures[selected.id]?.length ?? 0} 幢</p>
-          <p>参考出售均价：{selected.referenceSalePrice ?? '暂无'} 元/㎡　热门：{selected.isHot ? '是' : '否'}</p>
-          <p>经纬度：{selected.longitude}, {selected.latitude}　配套摘要：{selected.summary || '暂无'}</p>
-          <p>关联设施：{amenities.filter((item) => item.communityIds.includes(selected.id)).map((item) => item.name).join('、') || '暂无'}</p>
-        </div> : selectedRegionId ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>{regions.find((region) => region.id === selectedRegionId)?.name}</h3>
-          <Space><Button onClick={() => setRegionEditor(regions.find((region) => region.id === selectedRegionId) ?? null)}>编辑片区</Button>
-            <Popconfirm title="删除片区？关联小区进入废弃小区站" onConfirm={() => void run(async () => { await api.deleteRegion(selectedRegionId); setSelectedRegionId(null); }, '片区已删除')}>
-              <Button danger>删除片区</Button></Popconfirm></Space></div></div>
-          : <div className="admin-work-panel"><div className="admin-panel-title"><h3>废弃小区站</h3><span>{discarded.length} 个</span></div>
-            <Space><Select placeholder="选择目标片区" value={targetRegionId} onChange={setTargetRegionId}
-              options={regions.map((item) => ({ label: item.name, value: item.id }))} style={{ width: 180 }} />
-              <Button disabled={!batchIds.length || !targetRegionId} onClick={() => void run(async () => { await api.assignCommunities(batchIds, targetRegionId!); setBatchIds([]); }, '已移回片区')}>批量移回片区</Button>
-              <Popconfirm title="永久删除选中小区及其房源图片？" onConfirm={() => void run(async () => { await api.deleteCommunities(batchIds); setBatchIds([]); }, '已永久删除')}>
-                <Button danger disabled={!batchIds.length}>永久删除</Button></Popconfirm></Space>
-            <Table rowKey="id" size="small" dataSource={discarded} rowSelection={{ selectedRowKeys: batchIds, onChange: (keys) => setBatchIds(keys.map(String)) }}
-              columns={[{ title: '小区', dataIndex: 'name' }, { title: '地址', dataIndex: 'address' },
-                { title: '操作', render: (_, row) => <Button size="small" onClick={() => setEditor(row)}>编辑</Button> }]} /></div>}
+            mapPosition={focusPosition} onSaved={async () => { await reload(); setEditor(null); }} onCancel={() => setEditor(null)} /></div>}
+        {regionEditor && <RegionEditor open region={regionEditor === 'new' ? undefined : regionEditor} polygon={drawnPolygon}
+          onClose={() => setRegionEditor(null)} onSaved={reload} />}
       </div>
     </div>
     <Modal open={Boolean(selected && editor === null)} title={selected ? selected.name + ' · 小区详情' : '小区详情'}
@@ -170,6 +149,9 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
         <p>规划楼幢数：{selected.buildingCount}　已录入：{structures[selected.id]?.length ?? 0} 幢</p>
         <p>参考出售均价：{selected.referenceSalePrice ?? '暂无'} 元/㎡</p>
         <p>经纬度：{selected.longitude}, {selected.latitude}</p><p>配套摘要：{selected.summary || '暂无'}</p>
+        <p>小区简介：{selected.description || '暂无'}</p>
+        <div className="community-image-previews">{selected.mainMediaId && <Image src={`/api/media/${selected.mainMediaId}`} width={180} />}
+          {selected.detailMediaIds.map((id) => <Image key={id} src={`/api/media/${id}`} width={130} />)}</div>
         <p>关联设施：{amenities.filter((item) => item.communityIds.includes(selected.id)).map((item) => item.name).join('、') || '暂无'}</p>
       </div>}
     </Modal>
@@ -178,7 +160,7 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
         actualBuildingCount={structures[editor.id]?.length ?? 0} initialRegionId={selectedRegionId} mapPosition={focusPosition}
         onSaved={async () => { await reload(); setEditor(null); }} onCancel={() => setEditor(null)} />}
     </Modal>
-    <CommunityQuickActions open={quickOpen} onClose={() => setQuickOpen(false)} communities={communities} regions={regions} amenities={amenities}
+    <CommunityQuickActions open={quickOpen} onClose={() => setQuickOpen(false)} communities={communities} regions={regions} amenities={amenities} discardedOnly={discardedOnly}
       reload={reload} onEdit={(item) => { setQuickOpen(false); chooseCommunity(item); setEditor(item); }} />
   </div>;
 }

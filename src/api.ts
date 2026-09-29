@@ -7,6 +7,7 @@ export type Community = {
   id: string; regionId: string | null; name: string; address: string;
   longitude: number; latitude: number; deliveryDate: string;
   summary: string; visible: boolean; isHot: boolean;
+  description: string; mainMediaId: string | null; detailMediaIds: string[];
   buildingCount: number; referenceSalePrice: number | null;
 };
 export type Amenity = {
@@ -58,9 +59,9 @@ export const api = {
   updateRegion: (id: string, input: Pick<Region, 'name' | 'color' | 'polygon'>) =>
     request<Region>(`/api/admin/regions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteRegion: (id: string) => request<void>(`/api/admin/regions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  addCommunity: (input: Pick<Community, 'regionId' | 'name' | 'address' | 'longitude' | 'latitude' | 'deliveryDate'> & { summary?: string; buildingCount?: number; referenceSalePrice?: number | null }) =>
+  addCommunity: (input: Pick<Community, 'regionId' | 'name' | 'address' | 'longitude' | 'latitude' | 'deliveryDate'> & { summary?: string; description?: string; mainMediaId?: string | null; detailMediaIds?: string[]; buildingCount?: number; referenceSalePrice?: number | null }) =>
     request<Community>('/api/admin/communities', { method: 'POST', body: JSON.stringify(input) }),
-  updateCommunity: (id: string, input: Pick<Community, 'regionId' | 'name' | 'address' | 'longitude' | 'latitude' | 'deliveryDate' | 'summary' | 'buildingCount' | 'referenceSalePrice' | 'isHot' | 'visible'> & { amenityIds: string[] }) =>
+  updateCommunity: (id: string, input: Pick<Community, 'regionId' | 'name' | 'address' | 'longitude' | 'latitude' | 'deliveryDate' | 'summary' | 'description' | 'mainMediaId' | 'detailMediaIds' | 'buildingCount' | 'referenceSalePrice' | 'isHot' | 'visible'> & { amenityIds: string[] }) =>
     request<Community>(`/api/admin/communities/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
   updateCommunityPropertyInfo: (id: string, input: Pick<Community, 'buildingCount' | 'referenceSalePrice'>) =>
     request<Community>(`/api/admin/communities/${encodeURIComponent(id)}/property-info`, { method: 'PUT', body: JSON.stringify(input) }),
@@ -69,6 +70,7 @@ export const api = {
   deleteCommunities: (communityIds: string[]) =>
     request<{ deleted: number }>('/api/admin/communities/bulk-delete', { method: 'POST', body: JSON.stringify({ communityIds }) }),
   deleteCommunity: (id: string) => request<void>(`/api/admin/communities/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteMedia: (id: string) => request<void>(`/api/admin/media/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   setCommunityHot: (id: string, isHot: boolean) => request<Community>(`/api/admin/communities/${encodeURIComponent(id)}/hot`, { method: 'PUT', body: JSON.stringify({ isHot }) }),
   allAmenities: () => request<Amenity[]>('/api/amenities'),
   amenities: (communityId: string) => request<Amenity[]>(`/api/communities/${encodeURIComponent(communityId)}/amenities`),
