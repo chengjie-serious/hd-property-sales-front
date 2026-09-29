@@ -5,12 +5,14 @@ import { CommunitiesPage } from './CommunitiesPage';
 import { DictionaryPage } from './DictionaryPage';
 import { FacilitiesPage } from './FacilitiesPage';
 import { ListingsPage } from './ListingsPage';
+import { OverviewBoundaryPage } from './OverviewBoundaryPage';
 
-type MenuKey = 'communities' | 'listings' | 'facilities' | 'dictionary';
+type MenuKey = 'communities' | 'listings' | 'facilities' | 'dictionary' | 'boundary';
 const items: Array<{ key: MenuKey; label: string }> = [
   { key: 'communities', label: '片区与小区' },
   { key: 'listings', label: '出售 / 租赁房屋列表' }, { key: 'facilities', label: '周边设施' },
   { key: 'dictionary', label: '字典列表' },
+  { key: 'boundary', label: '横店轮廓' },
 ];
 
 export function AdminApp() {
@@ -42,7 +44,7 @@ export function AdminApp() {
       trigger={null} className="admin-main-sidebar">
       <div className="sidebar-heading"><Button type="text" aria-label={menuCollapsed ? '展开菜单' : '收起菜单'} onClick={() => setMenuCollapsed((current) => !current)}>{menuCollapsed ? '☰' : '☰ 收起'}</Button>
         {!menuCollapsed && <><div className="eyebrow">ADMIN CONSOLE</div><h1>管理菜单</h1></>}</div>
-      <Menu mode="inline" inlineCollapsed={menuCollapsed} selectedKeys={[menu]} items={items.map((item, index) => ({ ...item, icon: <span>{['区', '房', '设', '字'][index]}</span> }))}
+      <Menu mode="inline" inlineCollapsed={menuCollapsed} selectedKeys={[menu]} items={items.map((item, index) => ({ ...item, icon: <span>{['区', '房', '设', '字', '界'][index]}</span> }))}
         onClick={({ key }) => setMenu(key as MenuKey)} />
     </Layout.Sider><Layout.Content className="admin-main-content">
       {error && <Alert type="error" showIcon message={error} className="admin-global-error" />}
@@ -51,6 +53,7 @@ export function AdminApp() {
         {menu === 'listings' && <ListingsPage listings={listings} regions={regions} communities={communities} reload={reload} openCommunity={(id) => { setFocusCommunityId(id); setMenu('communities'); }} />}
         {menu === 'facilities' && <FacilitiesPage amenities={amenities} types={types} communities={communities} regions={regions} boundary={boundary} reload={reload} />}
         {menu === 'dictionary' && <DictionaryPage types={types} amenities={amenities} reload={reload} />}
+        {menu === 'boundary' && <OverviewBoundaryPage regions={regions} boundary={boundary} reload={reload} />}
       </>}
     </Layout.Content></Layout>
   </Layout>;

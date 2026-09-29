@@ -1,6 +1,6 @@
 import AMapLoader from '@amap/amap-jsapi-loader';
 import { Button, Empty, Spin } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Amenity, Community, CommunitySummary, Position, Region } from './api';
 import { MAP_CONFIG, mapKeyConfigured } from './config/map';
 import { amenityMarkerText } from './domain/amenity-marker';
@@ -25,6 +25,7 @@ type Props = {
   onMapClick?: (position: Position) => void;
   focusPosition?: Position | null;
   overviewBoundary?: Position[] | null;
+  draftPolygon?: Position[] | null;
   manualBoundaryMode?: boolean;
   drawLabel?: string;
 };
@@ -35,9 +36,32 @@ export function MapView(props: Props) {
   const amap = useRef<any>(null);
   const overlays = useRef<any[]>([]);
   const townBoundary = useRef<any>(null);
-  const initialZoomLocked = useRef(false);
+  const boundaryZoomKey = useRef<string | null>(null);
+  const mouseTool = useRef<any>(null);
+  const onPolygonDraw = useRef(props.onPolygonDraw);
+  onPolygonDraw.current = props.onPolygonDraw;
+  const [drawing, setDrawing] = useState(false);
   const [loading, setLoading] = useState(mapKeyConfigured);
   const [error, setError] = useState('');
+  const stopDrawing = useCallback(() => {
+    mouseTool.current?.close(true);
+    mouseTool.current = null;
+    setDrawing(false);
+  }, []);
+  const drawingEnabled = Boolean(props.onPolygonDraw);
+
+  useEffect(() => {
+    if (!drawingEnabled) stopDrawing();
+    return () => { if (drawingEnabled) stopDrawing(); };
+  }, [drawingEnabled, stopDrawing]);
+  useEffect(() => {
+    if (!drawing) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); stopDrawing(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [drawing, stopDrawing]);
 
   useEffect(() => {
     if (!mapKeyConfigured || !container.current) return;
@@ -57,24 +81,29 @@ export function MapView(props: Props) {
         setLoading(false);
       })
       .catch(() => { if (!cancelled) { setError('地图加载失败，请检查 JS API Key、安全密钥及网络。'); setLoading(false); } });
-    return () => { cancelled = true; map.current?.destroy(); map.current = null; townBoundary.current = null; initialZoomLocked.current = false; };
+    return () => { cancelled = true; mouseTool.current?.close(true); mouseTool.current = null;
+      map.current?.destroy(); map.current = null; townBoundary.current = null; boundaryZoomKey.current = null; };
   }, []);
 
   useEffect(() => {
     if (!map.current || !amap.current) return;
     if (townBoundary.current) map.current.remove(townBoundary.current);
     townBoundary.current = null;
-    if (!props.overviewBoundary?.length) return;
+    const zoomKey = JSON.stringify(props.overviewBoundary ?? null);
+    const boundaryChanged = boundaryZoomKey.current !== zoomKey;
+    boundaryZoomKey.current = zoomKey;
+    if (!props.overviewBoundary?.length) {
+      if (boundaryChanged) map.current.setZooms([13, 20]);
+      return;
+    }
     const boundary = new amap.current.Polygon({ path: props.overviewBoundary, strokeColor: '#227a76', strokeWeight: 3,
       fillColor: '#44a69a', fillOpacity: 0.07, zIndex: 1, bubble: true });
     townBoundary.current = boundary;
     map.current.add(boundary);
-    if (!props.selectedRegionId && !props.focusPosition) {
+    if (boundaryChanged) map.current.setZooms([2, 20]);
+    if (boundaryChanged || (!props.selectedRegionId && !props.focusPosition)) {
       map.current.setFitView([boundary], true, [40, 40, 40, 40]);
-      if (!initialZoomLocked.current) {
-        map.current.setZooms([map.current.getZoom(), 20]);
-        initialZoomLocked.current = true;
-      }
+      if (boundaryChanged) map.current.setZooms([map.current.getZoom(), 20]);
     }
   }, [loading, props.overviewBoundary, props.selectedRegionId, props.focusPosition]);
 
@@ -97,6 +126,12 @@ export function MapView(props: Props) {
     for (const overlay of overlays.current) map.current.remove(overlay);
     overlays.current = [];
     const AMap = amap.current;
+    if (props.draftPolygon?.length) {
+      const draft = new AMap.Polygon({ path: props.draftPolygon, strokeColor: '#e88b18', strokeWeight: 4,
+        fillColor: '#f3b44b', fillOpacity: 0.18, zIndex: 110, bubble: true });
+      map.current.add(draft);
+      overlays.current.push(draft);
+    }
     for (const region of props.regions) {
       if (region.status !== 'published') continue;
       const polygon = new AMap.Polygon({
@@ -107,13 +142,13 @@ export function MapView(props: Props) {
         strokeWeight: props.selectedRegionId === region.id ? 4 : 2,
         bubble: true,
       });
-      polygon.on('click', () => props.onRegionSelect(region.id));
+      polygon.on('click', () => { if (!mouseTool.current) props.onRegionSelect(region.id); });
       map.current.add(polygon);
       overlays.current.push(polygon);
       const label = new AMap.Text({ text: region.name, position: regionLabelPosition(region.polygon), anchor: 'center', zIndex: 120,
         style: { padding: '5px 11px', borderRadius: '16px', backgroundColor: 'rgba(16, 38, 56, .85)',
           color: '#fff', fontSize: '13px', fontWeight: '600', border: `1px solid ${region.color}`, whiteSpace: 'nowrap' } });
-      label.on('click', () => props.onRegionSelect(region.id));
+      label.on('click', () => { if (!mouseTool.current) props.onRegionSelect(region.id); });
       map.current.add(label);
       overlays.current.push(label);
     }
@@ -171,17 +206,19 @@ export function MapView(props: Props) {
       );
       map.current.setBounds(bounds, false, [80, 80, 80, 80]);
     } else if (townBoundary.current) map.current.setFitView([townBoundary.current], false, [40, 40, 40, 40]);
-  }, [loading, props.regions, props.communities, props.amenities, props.summaries, props.selectedRegionId, props.focusPosition, props.onRegionSelect, props.onCommunitySelect, props.onAmenitySelect]);
+  }, [loading, props.regions, props.communities, props.amenities, props.summaries, props.draftPolygon, props.selectedRegionId, props.focusPosition, props.onRegionSelect, props.onCommunitySelect, props.onAmenitySelect]);
 
   function startDrawing() {
     if (!map.current || !amap.current || !props.onPolygonDraw) return;
-    const mouseTool = new amap.current.MouseTool(map.current);
-    mouseTool.on('draw', (event: any) => {
+    if (mouseTool.current) { stopDrawing(); return; }
+    mouseTool.current = new amap.current.MouseTool(map.current);
+    mouseTool.current.on('draw', (event: any) => {
       const polygon = event.obj.getPath().map((point: any) => [point.getLng(), point.getLat()] as Position);
-      props.onPolygonDraw?.(polygon);
-      mouseTool.close(true);
+      stopDrawing();
+      onPolygonDraw.current?.(polygon);
     });
-    mouseTool.polygon({ strokeColor: '#1677ff', fillColor: '#1677ff', fillOpacity: 0.25 });
+    mouseTool.current.polygon({ strokeColor: '#1677ff', fillColor: '#1677ff', fillOpacity: 0.25 });
+    setDrawing(true);
   }
 
   if (!mapKeyConfigured) {
@@ -191,8 +228,9 @@ export function MapView(props: Props) {
     <div ref={container} className="map-canvas" />
     {loading && <div className="map-overlay"><Spin description="地图加载中" /></div>}
     {error && <div className="map-overlay"><Empty description={error} /></div>}
-    {!error && !loading && <div className="town-boundary-note">{props.overviewBoundary?.length ? '横店整体轮廓 · 固定版本' : '横店整体轮廓加载中'}</div>}
+    {!error && !loading && <div className="town-boundary-note">{props.overviewBoundary?.length ? '横店整体轮廓' : '尚未绘制横店轮廓'}</div>}
     {props.onPolygonDraw && !loading && !error &&
-      <Button className="draw-button" type="primary" onClick={startDrawing}>{props.drawLabel ?? '绘制片区边界'}</Button>}
+      <Button className="draw-button" type={drawing ? 'default' : 'primary'} onClick={startDrawing}>
+        {drawing ? '取消绘制（Esc）' : props.drawLabel ?? '绘制片区边界'}</Button>}
   </div>;
 }

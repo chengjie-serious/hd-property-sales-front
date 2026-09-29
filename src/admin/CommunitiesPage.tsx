@@ -96,11 +96,11 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
       <Space>{selectedRegionId && !selected && <><Button onClick={() => setRegionEditor(regions.find((region) => region.id === selectedRegionId) ?? null)}>编辑片区</Button>
         <Popconfirm title="删除片区？关联小区进入废弃小区站" onConfirm={() => void run(async () => { await api.deleteRegion(selectedRegionId); setSelectedRegionId(null); }, '片区已删除')}>
           <Button danger>删除片区</Button></Popconfirm></>}
-        <Button onClick={() => { setSelectedId(null); setRegionEditor(null); setEditor('new'); setFocusPosition(null); }}>新增小区</Button></Space></div>
+        <Button onClick={() => { setDiscardedOnly(false); setQuickOpen(true); }}>快速操作</Button></Space></div>
     <div className="admin-directory-layout">
       <div className="admin-directory-tree admin-directory-tree-managed">
         <div className="admin-tree-actions"><Button size="small" type="primary" onClick={() => { setSelectedId(null); setEditor(null); setRegionEditor('new'); setDrawnPolygon(null); setFocusPosition(null); }}>新增片区</Button>
-          <Button size="small" onClick={() => { setDiscardedOnly(false); setQuickOpen(true); }}>快速操作</Button></div>
+          <Button size="small" onClick={() => { setSelectedId(null); setRegionEditor(null); setEditor('new'); setFocusPosition(null); }}>新增小区</Button></div>
         <div className="admin-tree-scroll" ref={treeScrollRef} onScroll={updateFirstVisible}>
           {!!ancestors.length && <div className="admin-tree-path">{ancestors.map((title, index) => <span key={ancestorKeys[index]}>
             {index > 0 && ' › '}<button type="button" onClick={() => {
