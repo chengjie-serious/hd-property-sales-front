@@ -42,7 +42,7 @@ export function OverviewBoundaryPage({ regions, boundary, reload }: {
           onConfirm={() => void clear()}><Button danger disabled={!boundary || saving}>清除轮廓</Button></Popconfirm></Space></div>
     <div className="admin-boundary-map"><MapView regions={regions} communities={[]} amenities={[]} summaries={{}}
       selectedRegionId={null} onRegionSelect={() => {}} onCommunitySelect={() => {}}
-      overviewBoundary={boundary} draftPolygon={draft} onPolygonDraw={setDraft} drawLabel="绘制横店轮廓" />
+      overviewBoundary={boundary} draftPolygon={draft} extraZoomOutLevels={1} onPolygonDraw={setDraft} drawLabel="绘制横店轮廓" />
     </div>
   </div>;
 }

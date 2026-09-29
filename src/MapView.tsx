@@ -26,6 +26,7 @@ type Props = {
   focusPosition?: Position | null;
   overviewBoundary?: Position[] | null;
   draftPolygon?: Position[] | null;
+  extraZoomOutLevels?: number;
   manualBoundaryMode?: boolean;
   drawLabel?: string;
 };
@@ -89,11 +90,12 @@ export function MapView(props: Props) {
     if (!map.current || !amap.current) return;
     if (townBoundary.current) map.current.remove(townBoundary.current);
     townBoundary.current = null;
-    const zoomKey = JSON.stringify(props.overviewBoundary ?? null);
+    const extraZoomOutLevels = props.extraZoomOutLevels ?? 0;
+    const zoomKey = JSON.stringify([props.overviewBoundary ?? null, extraZoomOutLevels]);
     const boundaryChanged = boundaryZoomKey.current !== zoomKey;
     boundaryZoomKey.current = zoomKey;
     if (!props.overviewBoundary?.length) {
-      if (boundaryChanged) map.current.setZooms([13, 20]);
+      if (boundaryChanged) map.current.setZooms([Math.max(2, 13 - extraZoomOutLevels), 20]);
       return;
     }
     const boundary = new amap.current.Polygon({ path: props.overviewBoundary, strokeColor: '#227a76', strokeWeight: 3,
@@ -103,9 +105,9 @@ export function MapView(props: Props) {
     if (boundaryChanged) map.current.setZooms([2, 20]);
     if (boundaryChanged || (!props.selectedRegionId && !props.focusPosition)) {
       map.current.setFitView([boundary], true, [40, 40, 40, 40]);
-      if (boundaryChanged) map.current.setZooms([map.current.getZoom(), 20]);
+      if (boundaryChanged) map.current.setZooms([Math.max(2, map.current.getZoom() - extraZoomOutLevels), 20]);
     }
-  }, [loading, props.overviewBoundary, props.selectedRegionId, props.focusPosition]);
+  }, [loading, props.overviewBoundary, props.extraZoomOutLevels, props.selectedRegionId, props.focusPosition]);
 
   useEffect(() => {
     if (!container.current) return;
