@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal, Space, message } from 'antd';
+import { Button, Form, Input, Space, message } from 'antd';
 import { useEffect } from 'react';
 import { api, type Position, type Region } from '../api';
 
@@ -21,12 +21,12 @@ export function RegionEditor({ open, region, polygon, onClose, onSaved }: {
       await onSaved(); onClose(); messageApi.success('片区已保存');
     } catch (error) { messageApi.error(error instanceof Error ? error.message : '片区保存失败'); }
   }
-  return <Modal open={open} title={region ? '编辑片区' : '新增片区'} onCancel={onClose} footer={null} width={520} mask={false} style={{ marginRight: 24 }}>
+  return <div className="admin-work-panel"><div className="admin-panel-title"><h3>{region ? '编辑片区' : '新增片区'}</h3><Button onClick={onClose}>关闭</Button></div>
     {holder}<Form form={form} layout="vertical" onFinish={(values) => void save(values)}>
       <Form.Item name="name" label="片区名称" rules={[{ required: true }]}><Input /></Form.Item>
       <Form.Item name="color" label="片区颜色" rules={[{ required: true }]}><Input type="color" /></Form.Item>
       <Form.Item name="polygon" label="片区边界" rules={[{ required: true }]} extra="在地图绘制区域后自动写入；也可粘贴坐标数组"><Input.TextArea rows={5} /></Form.Item>
       <Space><Button type="primary" htmlType="submit">保存片区</Button><Button onClick={onClose}>取消</Button></Space>
     </Form>
-  </Modal>;
+  </div>;
 }

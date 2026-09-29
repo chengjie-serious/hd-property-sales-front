@@ -91,7 +91,8 @@ export const api = {
     communityId: string; buildingNumber: string; unitNumber: string; totalFloors: number;
     floor: number; roomNumber: string; type: 'sale' | 'rent' | 'both'; salePrice?: number; rentPrice?: number;
     area: number; bedrooms: number; livingRooms: number; bathrooms: number; decoration: string;
-    status: 'draft' | 'listed'; isDefault?: boolean; isGoodPrice?: boolean; isUrgentSale?: boolean;
+    status: 'draft' | 'listed'; isDefault?: boolean; isGoodPrice?: boolean;
+    saleGoodPrice?: boolean; rentGoodPrice?: boolean; isUrgentSale?: boolean;
   }, images: { main: File; floorplan?: File; details: File[] }) => {
     const body = new FormData();
     body.append('data', JSON.stringify(input));

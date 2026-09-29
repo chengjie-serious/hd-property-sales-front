@@ -66,8 +66,8 @@ export function MapView(props: Props) {
       fillColor: '#44a69a', fillOpacity: 0.07, zIndex: 1, bubble: true });
     townBoundary.current = boundary;
     map.current.add(boundary);
-    if (!props.selectedRegionId) map.current.setFitView([boundary], false, [40, 40, 40, 40]);
-  }, [loading, props.overviewBoundary, props.selectedRegionId]);
+    if (!props.selectedRegionId && !props.focusPosition) map.current.setFitView([boundary], false, [40, 40, 40, 40]);
+  }, [loading, props.overviewBoundary, props.selectedRegionId, props.focusPosition]);
 
   useEffect(() => {
     if (!container.current) return;
@@ -82,10 +82,6 @@ export function MapView(props: Props) {
     map.current.on('click', handler);
     return () => map.current?.off('click', handler);
   }, [loading, props.onMapClick]);
-
-  useEffect(() => {
-    if (map.current && props.focusPosition) map.current.setZoomAndCenter(16, props.focusPosition);
-  }, [loading, props.focusPosition]);
 
   useEffect(() => {
     if (!map.current || !amap.current) return;
@@ -152,14 +148,15 @@ export function MapView(props: Props) {
       overlays.current.push(marker);
     }
     const selected = props.regions.find((region) => region.id === props.selectedRegionId);
-    if (selected) {
+    if (props.focusPosition) map.current.setZoomAndCenter(16, props.focusPosition);
+    else if (selected) {
       const bounds = new AMap.Bounds(
         [Math.min(...selected.polygon.map((p) => p[0])), Math.min(...selected.polygon.map((p) => p[1]))],
         [Math.max(...selected.polygon.map((p) => p[0])), Math.max(...selected.polygon.map((p) => p[1]))],
       );
       map.current.setBounds(bounds, false, [80, 80, 80, 80]);
     } else if (townBoundary.current) map.current.setFitView([townBoundary.current], false, [40, 40, 40, 40]);
-  }, [loading, props.regions, props.communities, props.amenities, props.summaries, props.selectedRegionId, props.onRegionSelect, props.onCommunitySelect, props.onAmenitySelect]);
+  }, [loading, props.regions, props.communities, props.amenities, props.summaries, props.selectedRegionId, props.focusPosition, props.onRegionSelect, props.onCommunitySelect, props.onAmenitySelect]);
 
   function startDrawing() {
     if (!map.current || !amap.current || !props.onPolygonDraw) return;

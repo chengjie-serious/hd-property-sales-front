@@ -1,5 +1,5 @@
 import { Button, Modal, Popconfirm, Select, Space, Table, Tree, Typography, message } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Amenity, type Building, type Community, type Listing, type Position, type Region } from '../api';
 import { MapView } from '../MapView';
 import { getAncestorPath } from '../domain/tree-ancestor-path';
@@ -27,6 +27,7 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
   const [batchIds, setBatchIds] = useState<string[]>([]);
   const [targetRegionId, setTargetRegionId] = useState<string>();
   const [messageApi, holder] = message.useMessage();
+  const treeScrollRef = useRef<HTMLDivElement>(null);
   const selected = communities.find((item) => item.id === selectedId);
   const discarded = communities.filter((item) => item.regionId === null);
   useEffect(() => { if (focusCommunityId) setSelectedId(focusCommunityId); }, [focusCommunityId]);
@@ -41,10 +42,10 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
   }, [communities, listings, messageApi]);
   const treeData = useMemo<TreeNode[]>(() => {
     const communityNode = (community: Community): TreeNode => ({ key: 'community:' + community.id, title: community.name,
-      children: (structures[community.id] ?? []).map((building): TreeNode => ({ key: 'building:' + building.id, title: building.number + ' 幢',
-        children: building.units.map((unit): TreeNode => ({ key: 'unit:' + unit.id, title: unit.number + ' 单元',
+      children: (structures[community.id] ?? []).map((building): TreeNode => ({ key: 'building:' + community.id + ':' + building.id, title: building.number + ' 幢',
+        children: building.units.map((unit): TreeNode => ({ key: 'unit:' + community.id + ':' + unit.id, title: unit.number + ' 单元',
           children: [...new Set(unit.rooms.map((room) => room.floor))].sort((a, b) => a - b).map((floor): TreeNode => ({
-            key: 'floor:' + unit.id + ':' + floor, title: floor + ' 层',
+            key: 'floor:' + community.id + ':' + unit.id + ':' + floor, title: floor + ' 层',
             children: unit.rooms.filter((room) => room.floor === floor).map((room): TreeNode => ({
               key: 'room:' + community.id + ':' + room.id,
               title: room.number + ' 室' +
@@ -58,7 +59,7 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
     return [...regions.map((region): TreeNode => ({ key: 'region:' + region.id, title: region.name,
       children: communities.filter((item) => item.regionId === region.id).map(communityNode) })),
       { key: 'discarded', title: '废弃小区站（' + discarded.length + '）', children: discarded.map(communityNode) }];
-  }, [communities, discarded, listings, regions, structures]);
+  }, [communities, listings, regions, structures]);
   const parentByKey = useMemo(() => {
     const result: Record<string, string | null> = {};
     const walk = (nodes: TreeNode[], parent: string | null) => {
@@ -66,7 +67,18 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
     };
     walk(treeData, null); return result;
   }, [treeData]);
-  const ancestors = getAncestorPath(firstVisibleKey, parentByKey).map((key) => {
+  const updateFirstVisible = useCallback(() => {
+    const container = treeScrollRef.current;
+    if (!container) return;
+    const nodes = [...container.querySelectorAll<HTMLElement>('[role="treeitem"]')];
+    const top = container.getBoundingClientRect().top;
+    const visible = nodes.find((node) => node.getBoundingClientRect().bottom > top + 8);
+    const key = Object.keys(parentByKey).find((candidate) => visible?.id.endsWith('-' + candidate));
+    setFirstVisibleKey(key ?? '');
+  }, [parentByKey]);
+  useEffect(() => { updateFirstVisible(); }, [expandedKeys, updateFirstVisible]);
+  const ancestorKeys = getAncestorPath(firstVisibleKey, parentByKey);
+  const ancestors = ancestorKeys.map((key) => {
     const find = (nodes: TreeNode[]): TreeNode | undefined => {
       for (const node of nodes) { if (node.key === key) return node; const child = find(node.children ?? []); if (child) return child; }
     };
@@ -82,39 +94,46 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
   }
   return <div className="admin-page">{holder}
     <div className="admin-page-heading"><div><h2>片区与小区</h2><Typography.Text type="secondary">在地图维护片区与小区，房屋挂牌在独立菜单维护</Typography.Text></div>
-      <Button onClick={() => setQuickOpen(true)}>快速操作</Button></div>
+      <Button onClick={() => { setSelectedId(null); setRegionEditor(null); setEditor('new'); setFocusPosition(null); }}>新增小区</Button></div>
     <div className="admin-directory-layout">
       <div className="admin-directory-tree admin-directory-tree-managed">
-        <div className="admin-tree-actions"><Button size="small" type="primary" onClick={() => { setRegionEditor('new'); setDrawnPolygon(null); }}>新增片区</Button>
-          <Button size="small" onClick={() => setEditor('new')}>新增小区</Button></div>
-        <div className="admin-tree-scroll" onScroll={(event) => {
-          const container = event.currentTarget;
-          const nodes = [...container.querySelectorAll<HTMLElement>('[role="treeitem"]')];
-          const top = container.getBoundingClientRect().top;
-          const visible = nodes.find((node) => node.getBoundingClientRect().bottom > top + 8);
-          const key = Object.keys(parentByKey).find((candidate) => visible?.id.endsWith('-' + candidate));
-          if (key) setFirstVisibleKey(key);
-        }}>
-          {!!ancestors.length && <div className="admin-tree-path">{ancestors.join(' / ')}</div>}
+        <div className="admin-tree-actions"><Button size="small" type="primary" onClick={() => { setSelectedId(null); setEditor(null); setRegionEditor('new'); setDrawnPolygon(null); }}>新增片区</Button>
+          <Button size="small" onClick={() => setQuickOpen(true)}>快速操作</Button></div>
+        <div className="admin-tree-scroll" ref={treeScrollRef} onScroll={updateFirstVisible}>
+          {!!ancestors.length && <div className="admin-tree-path">{ancestors.map((title, index) => <span key={ancestorKeys[index]}>
+            {index > 0 && ' › '}<button type="button" onClick={() => {
+              const key = ancestorKeys[index];
+              const node = [...(treeScrollRef.current?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])]
+                .find((item) => item.id.endsWith('-' + key));
+              node?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }}>{title}</button></span>)}</div>}
           <Tree blockNode treeData={treeData} expandedKeys={expandedKeys} onExpand={(keys) => setExpandedKeys(keys)}
             selectedKeys={selectedId ? ['community:' + selectedId] : selectedRegionId ? ['region:' + selectedRegionId] : []}
             onSelect={(keys) => {
               const key = String(keys[0] ?? '');
               if (key.startsWith('region:')) { setSelectedRegionId(key.slice(7)); setSelectedId(null); }
               else if (key.startsWith('community:')) { const item = communities.find((community) => community.id === key.slice(10)); if (item) chooseCommunity(item); }
-              else if (key.startsWith('room:')) { const item = communities.find((community) => community.id === key.split(':')[1]); if (item) chooseCommunity(item); }
+              else if (['building', 'unit', 'floor', 'room'].some((kind) => key.startsWith(kind + ':'))) {
+                const item = communities.find((community) => community.id === key.split(':')[1]);
+                if (item) chooseCommunity(item);
+              }
               else if (key === 'discarded') { setSelectedId(null); setSelectedRegionId(null); }
             }} />
         </div>
       </div>
-      <div className="admin-directory-content">
+      <div className={editor === 'new' || regionEditor ? 'admin-directory-content admin-directory-content-editing' : 'admin-directory-content'}>
         <div className="admin-community-map"><MapView regions={regions} communities={communities.filter((item) => item.regionId !== null)}
           amenities={amenities} summaries={{}} selectedRegionId={selectedRegionId} onRegionSelect={(id) => { setSelectedRegionId(id); setSelectedId(null); }}
           onCommunitySelect={chooseCommunity} overviewBoundary={boundary} manualBoundaryMode focusPosition={focusPosition}
           onMapClick={editor ? (position) => setFocusPosition(position) : undefined}
           onPolygonDraw={regionEditor ? (polygon) => setDrawnPolygon(polygon) : undefined}
           drawLabel="绘制片区边界" /></div>
-        {selected ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>{selected.name}</h3>
+        {editor === 'new' ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>新增小区</h3><Button onClick={() => setEditor(null)}>关闭</Button></div>
+          <CommunityEditor regions={regions} amenities={amenities} actualBuildingCount={0} initialRegionId={selectedRegionId}
+            mapPosition={focusPosition} onSaved={async () => { await reload(); setEditor(null); }} onCancel={() => setEditor(null)} /></div>
+          : regionEditor ? <RegionEditor open region={regionEditor === 'new' ? undefined : regionEditor} polygon={drawnPolygon}
+            onClose={() => setRegionEditor(null)} onSaved={reload} />
+          : selected ? <div className="admin-work-panel"><div className="admin-panel-title"><h3>{selected.name}</h3>
           <Space><Button onClick={() => setEditor(selected)}>编辑小区</Button>
             <Popconfirm title={selected.regionId ? '移入废弃小区站？' : '永久删除小区及其房源和图片？'}
               onConfirm={() => void run(async () => { await api.deleteCommunity(selected.id); setSelectedId(null); }, selected.regionId ? '已移入废弃站' : '已永久删除')}>
@@ -154,14 +173,12 @@ export function CommunitiesPage({ regions, communities, amenities, listings, bou
         <p>关联设施：{amenities.filter((item) => item.communityIds.includes(selected.id)).map((item) => item.name).join('、') || '暂无'}</p>
       </div>}
     </Modal>
-    <Modal open={editor !== null} title={editor === 'new' ? '新增小区' : '小区详情 · 编辑'} onCancel={() => setEditor(null)} footer={null} width={760} mask={false} style={{ marginRight: 24 }} destroyOnHidden>
-      {editor && <CommunityEditor community={editor === 'new' ? undefined : editor} regions={regions} amenities={amenities}
-        actualBuildingCount={editor === 'new' ? 0 : structures[editor.id]?.length ?? 0} initialRegionId={selectedRegionId} mapPosition={focusPosition}
+    <Modal open={editor !== null && editor !== 'new'} title="小区详情 · 编辑" onCancel={() => setEditor(null)} footer={null} width={760} destroyOnHidden>
+      {editor && editor !== 'new' && <CommunityEditor community={editor} regions={regions} amenities={amenities}
+        actualBuildingCount={structures[editor.id]?.length ?? 0} initialRegionId={selectedRegionId} mapPosition={focusPosition}
         onSaved={async () => { await reload(); setEditor(null); }} onCancel={() => setEditor(null)} />}
     </Modal>
-    <RegionEditor open={regionEditor !== null} region={regionEditor === 'new' ? undefined : regionEditor ?? undefined}
-      polygon={drawnPolygon} onClose={() => setRegionEditor(null)} onSaved={reload} />
-    <CommunityQuickActions open={quickOpen} onClose={() => setQuickOpen(false)} communities={communities} regions={regions}
+    <CommunityQuickActions open={quickOpen} onClose={() => setQuickOpen(false)} communities={communities} regions={regions} amenities={amenities}
       reload={reload} onEdit={(item) => { setQuickOpen(false); chooseCommunity(item); setEditor(item); }} />
   </div>;
 }

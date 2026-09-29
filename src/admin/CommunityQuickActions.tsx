@@ -1,9 +1,9 @@
 import { Button, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useMemo, useState } from 'react';
-import { api, type Community, type Region } from '../api';
+import { api, type Amenity, type Community, type Region } from '../api';
 
-export function CommunityQuickActions({ open, onClose, communities, regions, onEdit, reload }: {
-  open: boolean; onClose: () => void; communities: Community[]; regions: Region[];
+export function CommunityQuickActions({ open, onClose, communities, regions, amenities, onEdit, reload }: {
+  open: boolean; onClose: () => void; communities: Community[]; regions: Region[]; amenities: Amenity[];
   onEdit: (community: Community) => void; reload: () => Promise<void>;
 }) {
   const [query, setQuery] = useState('');
@@ -39,6 +39,8 @@ export function CommunityQuickActions({ open, onClose, communities, regions, onE
         { title: '热门', width: 75, render: (_, row) => row.isHot ? <Tag color="red">是</Tag> : '否' },
         { title: '展示', width: 75, render: (_, row) => row.visible ? '是' : '否' },
         { title: '配套摘要', dataIndex: 'summary', width: 160, ellipsis: true },
+        { title: '关联设施', width: 200, ellipsis: true, render: (_, row) => amenities
+          .filter((item) => item.communityIds.includes(row.id)).map((item) => item.name).join('、') || '暂无' },
         { title: '操作', fixed: 'right', width: 150, render: (_, row) => <Space><Button size="small" onClick={() => onEdit(row)}>编辑</Button>
           <Popconfirm title={row.regionId ? '移入废弃小区站？' : '永久删除小区及其房源和图片？'}
             onConfirm={() => void run(() => api.deleteCommunity(row.id), row.regionId ? '已移入废弃站' : '已永久删除')}>

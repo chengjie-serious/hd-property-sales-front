@@ -15,9 +15,10 @@ export function CommunityEditor({ community, regions, amenities, actualBuildingC
   useEffect(() => {
     form.setFieldsValue(community ? { ...community, regionId: community.regionId ?? undefined,
       deliveryDate: dayjs(community.deliveryDate), amenityIds: amenities.filter((item) => item.communityIds.includes(community.id)).map((item) => item.id) }
-      : { regionId: initialRegionId ?? undefined, name: '', address: '', buildingCount: 0, referenceSalePrice: null,
+      : { name: '', address: '', buildingCount: 0, referenceSalePrice: null,
         isHot: false, visible: true, summary: '', amenityIds: [] });
-  }, [community, initialRegionId, amenities, form]);
+  }, [community, amenities, form]);
+  useEffect(() => { if (!community) form.setFieldValue('regionId', initialRegionId ?? undefined); }, [community, initialRegionId, form]);
   useEffect(() => { if (mapPosition) form.setFieldsValue({ longitude: mapPosition[0], latitude: mapPosition[1] }); }, [mapPosition, form]);
   async function submit(values: Values) {
     try {

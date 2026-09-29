@@ -6,7 +6,7 @@ type Values = {
   buildingNumber: string; unitNumber: string; totalFloors: number; floor: number; roomNumber: string;
   type: 'sale' | 'rent' | 'both'; salePrice?: number; rentPrice?: number; area: number;
   bedrooms: number; livingRooms: number; bathrooms: number; decoration: string;
-  status: 'draft' | 'listed'; isDefault?: boolean; isGoodPrice?: boolean; isUrgentSale?: boolean;
+  status: 'draft' | 'listed'; isDefault?: boolean; saleGoodPrice?: boolean; rentGoodPrice?: boolean; isUrgentSale?: boolean;
 };
 
 export function UnifiedHomeForm({ communityId, communityName, onChange }: {
@@ -47,7 +47,7 @@ export function UnifiedHomeForm({ communityId, communityName, onChange }: {
   return <div className="property-forms">{contextHolder}<div className="property-forms-heading"><h3>{communityName} · 房屋信息</h3>
     <Typography.Text type="secondary">填写房间位置、出售／租赁信息和图片，点击一次保存。</Typography.Text></div>
     <Card className="form-card listing-form-card"><Form<Values> form={form} layout="vertical" initialValues={{ type: 'sale', status: 'listed', bedrooms: 2,
-      livingRooms: 1, bathrooms: 1, decoration: '精装', isDefault: false, isGoodPrice: false, isUrgentSale: false }} onFinish={(values) => void save(values)}>
+      livingRooms: 1, bathrooms: 1, decoration: '精装', isDefault: false, saleGoodPrice: false, rentGoodPrice: false, isUrgentSale: false }} onFinish={(values) => void save(values)}>
       <div className="form-row"><Form.Item label="几幢" name="buildingNumber" rules={[{ required: true }]}><AutoComplete options={structure.map((item) => ({ value: item.number }))}
         onSelect={(value) => { const building = structure.find((item) => item.number === value); if (building) form.setFieldValue('totalFloors', building.totalFloors); }}><Input placeholder="例如：1" /></AutoComplete></Form.Item>
         <Form.Item label="几单元" name="unitNumber" rules={[{ required: true }]}><AutoComplete options={(selectedBuilding?.units ?? []).map((item) => ({ value: item.number }))}><Input placeholder="例如：2" /></AutoComplete></Form.Item></div>
@@ -66,7 +66,8 @@ export function UnifiedHomeForm({ communityId, communityName, onChange }: {
       <div className="form-row"><Form.Item label="装修状况" name="decoration" rules={[{ required: true }]}><Select options={
         ['毛坯', '简装', '精装', '豪华装修'].map((value) => ({ value, label: value }))} /></Form.Item>
         <Form.Item label="设为该楼幢默认展示房间" name="isDefault" valuePropName="checked"><Switch /></Form.Item></div>
-      <div className="form-row"><Form.Item label="好价" name="isGoodPrice" valuePropName="checked"><Switch /></Form.Item>
+      <div className="form-row">{type !== 'rent' && <Form.Item label="售房好价" name="saleGoodPrice" valuePropName="checked"><Switch /></Form.Item>}
+        {type !== 'sale' && <Form.Item label="租赁好价" name="rentGoodPrice" valuePropName="checked"><Switch /></Form.Item>}
         {type !== 'rent' && <Form.Item label="急售" name="isUrgentSale" valuePropName="checked"><Switch /></Form.Item>}</div>
       <div className="image-inputs"><label>主图（必填）<input key={`main-${fileInputVersion}`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setMainImage(event.target.files?.[0])} />{mainImage && <span>{mainImage.name}</span>}</label>
         <label>户型图（可选）<input key={`floorplan-${fileInputVersion}`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFloorplanImage(event.target.files?.[0])} />{floorplanImage && <span>{floorplanImage.name}</span>}</label>
